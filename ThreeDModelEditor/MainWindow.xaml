@@ -1,0 +1,104 @@
+﻿<Window x:Class="ThreeDModelEditor.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:ThreeDModelEditor"
+        mc:Ignorable="d"
+        xmlns:helix="http://helix-toolkit.org/wpf"
+        Title="3D Создание" Height="700" Width="900" MinHeight="700" MinWidth="900">
+
+    <DockPanel>
+
+        <!-- Верхнее меню -->
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_Файл">
+                <MenuItem Header="_Открыть" Click="OpenFile_Click"/>
+                <MenuItem Header="_Сохранить" Click="SaveFile_Click"/>
+            </MenuItem>
+            <MenuItem Header="_Главное">
+                <MenuItem Header="_Новая сцена" Click="NewScene_Click"/>
+                <MenuItem Header="_Вспомогательная панель" Click="ToggleSidebar_Click"/>
+            </MenuItem>
+            <MenuItem Header="_Добавить">
+                <MenuItem Header="Куб" Click="AddCube_Click"/>
+                <MenuItem Header="Сфера" Click="AddSphere_Click"/>
+                <MenuItem Header="Пирамида/конус" Click="AddPyramid_Click"/>
+                <MenuItem Header="Цилиндр" Click="AddCylinder_Click"/>
+            </MenuItem>
+        </Menu>
+
+        <!-- ПРАВАЯ ПАНЕЛЬ -->
+        <Border x:Name="RightPanel"
+        DockPanel.Dock="Right"
+        Background="LightGray"
+        Width="250"
+        BorderBrush="Gray"
+        BorderThickness="1"
+        Padding="10"
+        Visibility="Collapsed">
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <Button Content="Скрыть панель" Click="ToggleSidebar_Click" />
+                    <Separator Margin="5"/>
+                    <TextBlock Text="Управление:" FontWeight="Bold" Margin="0,5"/>
+                    <Button Content="Удалить выделенное" Click="DeleteSelected_Click" />
+
+                    <Separator Margin="5"/>
+                    <TextBlock Text="Размеры (X, Y, Z):" FontWeight="Bold" Margin="0,5"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,2">
+                        <TextBox x:Name="SizeXBox" Width="40" Margin="2"/>
+                        <TextBox x:Name="SizeYBox" Width="40" Margin="2"/>
+                        <TextBox x:Name="SizeZBox" Width="40" Margin="2"/>
+                    </StackPanel>
+                    <Button Content="Применить масштаб" Click="ApplyScale_Click" />
+
+                    <Separator Margin="5"/>
+
+                    <TextBlock Text="Перемещение:" FontWeight="Bold" Margin="0,5"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,2">
+                        <Label Content="X:" Width="20"/>
+                        <TextBox x:Name="MoveXBox" Width="40" Margin="2"/>
+                        <Label Content="Y:" Width="20"/>
+                        <TextBox x:Name="MoveYBox" Width="40" Margin="2"/>
+                        <Label Content="Z:" Width="20"/>
+                        <TextBox x:Name="MoveZBox" Width="40" Margin="2"/>
+                    </StackPanel>
+                    <Button Content="Сдвинуть" Click="MoveButton_Click" Margin="0,5"/>
+
+                    <Separator Margin="5"/>
+                    <TextBlock Text="Поворот:" FontWeight="Bold" Margin="0,5"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                        <Label Content="X:" Width="20"/>
+                        <TextBox x:Name="RotateXBox" Width="40" Margin="2"/>
+                        <Label Content="Y:" Width="20"/>
+                        <TextBox x:Name="RotateYBox" Width="40" Margin="2"/>
+                        <Label Content="Z:" Width="20"/>
+                        <TextBox x:Name="RotateZBox" Width="40" Margin="2"/>
+                    </StackPanel>
+                    <Button Content="Повернуть" Click="RotateButton_Click" Margin="0,5"/>
+
+                    <!-- Здесь позже можно будет вставить список слоёв -->
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- сцена -->
+        <helix:HelixViewport3D x:Name="viewport"
+                               ShowViewCube="False"
+                               MouseDown="viewport_MouseDown"
+                               CameraRotationMode="Trackball"
+                               RotateAroundMouseDownPoint="False"
+                               ShowCoordinateSystem="True"
+                               IsPanEnabled="True"
+                               IsZoomEnabled="True"
+                               IsRotationEnabled="True">
+            <helix:HelixViewport3D.Camera>
+                <PerspectiveCamera x:Name="mainCamera" />
+            </helix:HelixViewport3D.Camera>
+
+        </helix:HelixViewport3D>
+
+    </DockPanel>
+</Window>
