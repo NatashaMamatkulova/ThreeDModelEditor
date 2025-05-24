@@ -64,7 +64,11 @@
     <Compile Include="AddPyramidWindow.xaml.cs">
       <DependentUpon>AddPyramidWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="HotkeysWindow.xaml.cs">
+      <DependentUpon>HotkeysWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="SceneAction.cs" />
+    <Compile Include="SceneObjectInfo.cs" />
     <Page Include="AddCubeWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -78,6 +82,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="AddSphereWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="HotkeysWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

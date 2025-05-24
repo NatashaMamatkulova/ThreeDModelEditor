@@ -19,6 +19,7 @@
             <MenuItem Header="_Главное">
                 <MenuItem Header="_Новая сцена" Click="NewScene_Click"/>
                 <MenuItem Header="_Вспомогательная панель" Click="ToggleSidebar_Click"/>
+                <MenuItem Header="_Справка по клавишам" Click="ShowHotkeys_Click"/>
             </MenuItem>
             <MenuItem Header="_Добавить">
                 <MenuItem Header="Куб" Click="AddCube_Click"/>
@@ -79,7 +80,11 @@
                     </StackPanel>
                     <Button Content="Повернуть" Click="RotateButton_Click" Margin="0,5"/>
 
-                    <!-- Здесь позже можно будет вставить список слоёв -->
+                    <Separator Margin="5"/>
+                    <TextBlock Text="Слои:" FontWeight="Bold" Margin="0,5"/>
+                    <StackPanel x:Name="LayerPanel"/>
+                    <TextBlock Text="Объекты:" FontWeight="Bold" Margin="0,5"/>
+                    <TreeView x:Name="ObjectTree" Height="200" SelectedItemChanged="ObjectTree_SelectedItemChanged"/>
                 </StackPanel>
             </ScrollViewer>
         </Border>

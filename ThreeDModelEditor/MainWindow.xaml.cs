@@ -32,6 +32,10 @@ namespace ThreeDModelEditor
         private Stack<SceneAction> undoStack = new Stack<SceneAction>();
         private Stack<SceneAction> redoStack = new Stack<SceneAction>();
         private const int MaxUndoSteps = 50;
+        private List<SceneObjectInfo> sceneObjects = new List<SceneObjectInfo>();
+        private List<SceneObjectInfo> copiedObjects = new List<SceneObjectInfo>();
+
+
 
         public MainWindow()
         {
@@ -71,17 +75,30 @@ namespace ThreeDModelEditor
 
             if (e.Key == Key.Delete)
             {
-                foreach (var obj in selectedObjects)
+                foreach (var obj in selectedObjects.ToList())
                 {
-                    AddUndoAction(new SceneAction
-                    {
-                        Type = ActionType.Remove,
-                        Target = obj
-                    });
-
-                    viewport.Children.Remove(obj);
+                    var found = sceneObjects.FirstOrDefault(o => o.Visual == obj);
+                    if (found != null)
+                        DeleteObject(found);
                 }
             }
+
+            // Копирование (Ctrl+C)
+            if (e.Key == Key.C && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                CopySelectedObjects();
+                e.Handled = true;
+                return;
+            }
+
+            // Вставка (Ctrl+V)
+            if (e.Key == Key.V && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                PasteCopiedObjects();
+                e.Handled = true;
+                return;
+            }
+
 
             // отмена
             if (e.Key == Key.Z && Keyboard.Modifiers == ModifierKeys.Control)
@@ -159,7 +176,13 @@ namespace ThreeDModelEditor
                     {
                         var oldTransform = visual.Transform?.Clone();
 
-                        var rotate = new RotateTransform3D(rotation, new Point3D(0, 0, 0));
+                        var bounds = GetTransformedBounds(visual);
+                        var center = new Point3D(
+                            bounds.X + bounds.SizeX / 2,
+                            bounds.Y + bounds.SizeY / 2,
+                            bounds.Z + bounds.SizeZ / 2);
+
+                        var rotate = new RotateTransform3D(rotation, center);
 
                         if (visual.Transform is Transform3DGroup group)
                         {
@@ -241,6 +264,150 @@ namespace ThreeDModelEditor
                 });
             }
         }
+
+
+        private void CopySelectedObjects()
+        {
+            copiedObjects.Clear();
+
+            foreach (var visual in selectedObjects)
+            {
+                var sceneObj = sceneObjects.FirstOrDefault(o => o.Visual == visual);
+                if (sceneObj != null)
+                {
+                    // Создаем глубокую копию информации об объекте
+                    var copy = new SceneObjectInfo
+                    {
+                        Name = sceneObj.Name,
+                        Layer = sceneObj.Layer,
+                        Visual = null, // будет создан при вставке
+                        OriginalContent = CloneModel3D(sceneObj.OriginalContent as Model3D),
+                        Transform = visual.Transform?.Clone(),
+                        IsVisible = sceneObj.IsVisible
+                    };
+
+                    copiedObjects.Add(copy);
+                }
+            }
+
+            if (copiedObjects.Count > 0)
+            {
+                MessageBox.Show($"Скопировано {copiedObjects.Count} объектов", "Информация",
+                               MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private void PasteCopiedObjects()
+        {
+            if (copiedObjects.Count == 0) return;
+
+            // Снимаем текущее выделение
+            foreach (var obj in selectedObjects)
+            {
+                ResetMaterial(obj);
+            }
+            selectedObjects.Clear();
+
+            // Создаем и добавляем копии объектов
+            foreach (var original in copiedObjects)
+            {
+                // Создаем новый визуальный элемент
+                var visual = new ModelVisual3D
+                {
+                    Content = CloneModel3D(original.OriginalContent as Model3D),
+                    Transform = original.Transform?.Clone()
+                };
+
+                // Добавляем небольшое смещение (1 по каждой оси)
+                var offset = new TranslateTransform3D(1, 1, 1);
+
+                if (visual.Transform is Transform3DGroup group)
+                {
+                    group.Children.Add(offset);
+                }
+                else if (visual.Transform != null)
+                {
+                    var newGroup = new Transform3DGroup();
+                    newGroup.Children.Add(visual.Transform);
+                    newGroup.Children.Add(offset);
+                    visual.Transform = newGroup;
+                }
+                else
+                {
+                    visual.Transform = offset;
+                }
+
+                viewport.Children.Add(visual);
+
+                // Создаем новую запись в списке объектов
+                string baseName = original.Name;
+                // Удаляем суффикс "(копия N)" если он есть
+                int copyIndex = baseName.LastIndexOf("(копия");
+                if (copyIndex > 0) baseName = baseName.Substring(0, copyIndex).Trim();
+
+                // Подсчитываем сколько уже есть копий с таким именем
+                int copyNumber = sceneObjects
+                    .Count(o => o.Name.StartsWith(baseName + "(копия")) + 1;
+
+                var newObj = new SceneObjectInfo
+                {
+                    Name = $"{baseName} (копия {copyNumber})",
+                    Layer = original.Layer,
+                    Visual = visual,
+                    OriginalContent = visual.Content,
+                    IsVisible = true
+                };
+
+                sceneObjects.Add(newObj);
+                selectedObjects.Add(visual);
+                SetSelectedMaterial(visual);
+
+                // Добавляем в стек undo
+                AddUndoAction(new SceneAction
+                {
+                    Type = ActionType.Add,
+                    Target = visual
+                });
+            }
+
+            UpdateObjectTree();
+        }
+
+        // Метод для глубокого копирования Model3D
+        private Model3D CloneModel3D(Model3D original)
+        {
+            if (original == null) return null;
+
+            if (original is GeometryModel3D geomModel)
+            {
+                return new GeometryModel3D
+                {
+                    Geometry = geomModel.Geometry.Clone(),
+                    Material = geomModel.Material,
+                    BackMaterial = geomModel.BackMaterial,
+                    Transform = geomModel.Transform?.Clone()
+                };
+            }
+
+            if (original is Model3DGroup group)
+            {
+                var newGroup = new Model3DGroup
+                {
+                    Transform = group.Transform?.Clone()
+                };
+
+                foreach (var child in group.Children)
+                {
+                    newGroup.Children.Add(CloneModel3D(child));
+                }
+
+                return newGroup;
+            }
+
+            // Для других типов Model3D (например, Light) просто возвращаем оригинал
+            return original;
+        }
+
 
         // оси в центре
         private void AddAxes()
@@ -365,7 +532,19 @@ namespace ThreeDModelEditor
         // новая сцена: начальная сцена при запуске, удаление фигуры, оставить необходимое освещение
         private void InitializeScene()
         {
+            // Очищаем визуальные элементы
             viewport.Children.Clear();
+
+            // Очищаем списки объектов
+            sceneObjects.Clear();
+            selectedObjects.Clear();
+
+            // Очищаем стеки undo/redo
+            undoStack.Clear();
+            redoStack.Clear();
+
+            // Очищаем дерево объектов
+            ObjectTree.Items.Clear();
 
             viewport.Background = new LinearGradientBrush(
                 Color.FromRgb(238, 238, 238),
@@ -375,7 +554,7 @@ namespace ThreeDModelEditor
 
             var camera = new PerspectiveCamera
             {
-                Position = new Point3D(20, 20, 20),
+                Position = new Point3D(10, 10, 10),
                 LookDirection = new Vector3D(-10, -10, -10),
                 UpDirection = new Vector3D(0, 1, 0)
 
@@ -499,23 +678,41 @@ namespace ThreeDModelEditor
                 : Visibility.Visible;
         }
 
-        // удалить
+        // удалить по кнопке
         private void DeleteSelected_Click(object sender, RoutedEventArgs e)
         {
             foreach (var obj in selectedObjects.ToList())
             {
-                AddUndoAction(new SceneAction
-                {
-                    Type = ActionType.Remove,
-                    Target = obj
-                });
-
-                viewport.Children.Remove(obj);
-                selectedObjects.Remove(obj);
+                var found = sceneObjects.FirstOrDefault(o => o.Visual == obj);
+                if (found != null)
+                    DeleteObject(found);
             }
         }
 
-        
+        //удаление из дерева
+        private void DeleteTreeItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (ObjectTree.SelectedItem is TreeViewItem item && item.Tag is SceneObjectInfo info)
+            {
+                var result = MessageBox.Show($"Удалить {info.Name}?", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (result == MessageBoxResult.Yes)
+                {
+                    DeleteObject(info);
+                }
+            }
+        }
+
+        //удаление полностью
+        private void DeleteObject(SceneObjectInfo obj)
+        {
+            viewport.Children.Remove(obj.Visual);
+            selectedObjects.Remove(obj.Visual);
+            sceneObjects.Remove(obj);
+            UpdateObjectTree();
+            
+        }
+
+
 
         // добавить куб
         private void AddCube_Click(object sender, RoutedEventArgs e)
@@ -542,6 +739,17 @@ namespace ThreeDModelEditor
 
                 var visual = new ModelVisual3D { Content = model };
                 viewport.Children.Add(visual);
+
+                string name = "Куб_" + (sceneObjects.Count(o => o.Name.StartsWith("Куб_")) + 1);
+                sceneObjects.Add(new SceneObjectInfo
+                {
+                    Name = name,
+                    Layer = "По умолчанию",
+                    Visual = visual,
+                    OriginalContent = visual.Content
+                });
+                UpdateObjectTree();
+               
                 AddUndoAction(new SceneAction
                 {
                     Type = ActionType.Add,
@@ -568,6 +776,17 @@ namespace ThreeDModelEditor
 
                 var visual = new ModelVisual3D { Content = model };
                 viewport.Children.Add(visual);
+
+                string name = "Сфера_" + (sceneObjects.Count(o => o.Name.StartsWith("Сфера_")) + 1);
+                sceneObjects.Add(new SceneObjectInfo
+                {
+                    Name = name,
+                    Layer = "По умолчанию",
+                    Visual = visual,
+                    OriginalContent = visual.Content
+                });
+                UpdateObjectTree();
+                
                 AddUndoAction(new SceneAction
                 {
                     Type = ActionType.Add,
@@ -640,6 +859,20 @@ namespace ThreeDModelEditor
                 var visual = new ModelVisual3D { Content = model };
 
                 viewport.Children.Add(visual);
+
+                string name = (sides < 3 ? "Конус_" : "Пирамида_") +
+                (sceneObjects.Count(o => o.Name.StartsWith(sides < 3 ? "Конус_" : "Пирамида_")) + 1);
+
+                sceneObjects.Add(new SceneObjectInfo
+                {
+                    Name = name,
+                    Layer = "По умолчанию",
+                    Visual = visual,
+                    OriginalContent = visual.Content
+                });
+
+                UpdateObjectTree();
+                
                 AddUndoAction(new SceneAction
                 {
                     Type = ActionType.Add,
@@ -680,6 +913,19 @@ namespace ThreeDModelEditor
                 var visual = new ModelVisual3D { Content = model };
 
                 viewport.Children.Add(visual);
+
+                string name = "Цилиндр_" + (sceneObjects.Count(o => o.Name.StartsWith("Цилиндр_")) + 1);
+
+                sceneObjects.Add(new SceneObjectInfo
+                {
+                    Name = name,
+                    Layer = "По умолчанию",
+                    Visual = visual,
+                    OriginalContent = visual.Content
+                });
+
+                UpdateObjectTree();
+                
                 AddUndoAction(new SceneAction
                 {
                     Type = ActionType.Add,
@@ -808,17 +1054,40 @@ namespace ThreeDModelEditor
             {
                 var oldTransform = visual.Transform?.Clone();
 
+                var bounds = GetTransformedBounds(visual);
+                var center = new Point3D(
+                    bounds.X + bounds.SizeX / 2,
+                    bounds.Y + bounds.SizeY / 2,
+                    bounds.Z + bounds.SizeZ / 2);
+
                 var group = new Transform3DGroup();
 
                 if (visual.Transform != null)
                     group.Children.Add(visual.Transform);
 
                 if (angleX != 0)
-                    group.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(1, 0, 0), angleX)));
+                {
+                    var rotationX = new RotateTransform3D(
+                        new AxisAngleRotation3D(new Vector3D(1, 0, 0), angleX),
+                        center);
+                    group.Children.Add(rotationX);
+                }
+
                 if (angleY != 0)
-                    group.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), angleY)));
+                {
+                    var rotationY = new RotateTransform3D(
+                        new AxisAngleRotation3D(new Vector3D(0, 1, 0), angleY),
+                        center);
+                    group.Children.Add(rotationY);
+                }
+
                 if (angleZ != 0)
-                    group.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 0, 1), angleZ)));
+                {
+                    var rotationZ = new RotateTransform3D(
+                        new AxisAngleRotation3D(new Vector3D(0, 0, 1), angleZ),
+                        center);
+                    group.Children.Add(rotationZ);
+                }
 
                 visual.Transform = group;
 
@@ -831,6 +1100,212 @@ namespace ThreeDModelEditor
                 });
             }
         }
+
+        //работа с древом слоев
+        private void UpdateObjectTree()
+        {
+            ObjectTree.Items.Clear();
+
+            foreach (var obj in sceneObjects)
+            {
+                // Создание CheckBox для управления видимостью
+                var checkBox = new CheckBox
+                {
+                    IsChecked = obj.IsVisible,
+                    Margin = new Thickness(0, 0, 5, 0),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+
+                // Обработчики изменения состояния CheckBox
+                checkBox.Checked += (s, e) =>
+                {
+                    obj.IsVisible = true;
+                    obj.Visual.Content = obj.OriginalContent as Model3D; // Явное приведение типа
+                };
+
+                checkBox.Unchecked += (s, e) =>
+                {
+                    obj.IsVisible = false;
+                    obj.Visual.Content = null;
+
+                    // Если объект был выделен - снимаем выделение
+                    if (selectedObjects.Contains(obj.Visual))
+                    {
+                        ResetMaterial(obj.Visual); // Сбрасываем материал
+                        selectedObjects.Remove(obj.Visual);
+                    }
+                };
+
+                // Текстовые элементы для имени объекта
+                var textBlock = new TextBlock { Text = obj.Name };
+                var textBox = new TextBox
+                {
+                    Text = obj.Name,
+                    Visibility = Visibility.Collapsed,
+                    MinWidth = 100
+                };
+
+                // Панель с элементами управления
+                var panel = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                panel.Children.Add(checkBox);
+                panel.Children.Add(textBlock);
+                panel.Children.Add(textBox);
+
+                // Создание элемента дерева
+                var item = new TreeViewItem
+                {
+                    Header = panel,
+                    Tag = obj,
+                    IsSelected = selectedObjects.Contains(obj.Visual)
+                };
+
+                // Контекстное меню
+                var contextMenu = new ContextMenu();
+
+                // Пункт меню "Удалить"
+                var deleteItem = new MenuItem { Header = "Удалить" };
+                deleteItem.Click += (s, e) =>
+                {
+                    var result = MessageBox.Show(
+                        $"Удалить {obj.Name}?",
+                        "Подтверждение",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question);
+
+                    if (result == MessageBoxResult.Yes)
+                        DeleteObject(obj);
+                };
+                contextMenu.Items.Add(deleteItem);
+
+                // Пункт меню "Переименовать"
+                var renameItem = new MenuItem { Header = "Переименовать" };
+                renameItem.Click += (s, e) =>
+                {
+                    textBox.Visibility = Visibility.Visible;
+                    textBox.Text = obj.Name;
+                    textBox.SelectAll();
+                    textBox.Focus();
+                    textBlock.Visibility = Visibility.Collapsed;
+                };
+                contextMenu.Items.Add(renameItem);
+
+                item.ContextMenu = contextMenu;
+
+                // Завершение редактирования имени
+                void FinishEdit()
+                {
+                    string newName = textBox.Text.Trim();
+                    if (!string.IsNullOrWhiteSpace(newName))
+                    {
+                        obj.Name = newName;
+                        textBlock.Text = newName;
+                    }
+                    textBox.Visibility = Visibility.Collapsed;
+                    textBlock.Visibility = Visibility.Visible;
+                }
+
+                textBox.LostFocus += (s, e) => FinishEdit();
+                textBox.KeyDown += (s, e) =>
+                {
+                    if (e.Key == Key.Enter)
+                    {
+                        FinishEdit();
+                        e.Handled = true;
+                    }
+                };
+
+                // Добавляем обработчик выбора элемента в дереве
+                item.Selected += (s, e) =>
+                {
+                    // Снимаем выделение со всех объектов
+                    foreach (var visual in selectedObjects.ToList())
+                    {
+                        ResetMaterial(visual);
+                    }
+                    selectedObjects.Clear();
+
+                    // Выделяем текущий объект, если он видим
+                    if (obj.IsVisible)
+                    {
+                        SetSelectedMaterial(obj.Visual);
+                        selectedObjects.Add(obj.Visual);
+                    }
+                };
+
+                ObjectTree.Items.Add(item);
+            }
+        }
+
+
+
+        //взаимодействие с древом слоев
+        private void ObjectTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            if (ObjectTree.SelectedItem is TreeViewItem item &&
+                item.Tag is SceneObjectInfo info)
+            {
+                // снять старое выделение
+                foreach (var obj in selectedObjects)
+                    ResetMaterial(obj); 
+                selectedObjects.Clear();
+
+                // новое выделение
+                SetSelectedMaterial(info.Visual);
+                selectedObjects.Add(info.Visual);
+            }
+        }
+
+        private void ResetMaterial(ModelVisual3D obj)
+        {
+            if (obj.Content is GeometryModel3D g)
+                g.Material = Materials.LightGray;
+            if (obj.Content is Model3DGroup group)
+            {
+                foreach (var child in group.Children)
+                {
+                    if (child is GeometryModel3D cg)
+                        cg.Material = Materials.LightGray;
+                }
+            }
+        }
+
+        private void SetSelectedMaterial(ModelVisual3D obj)
+        {
+            if (obj.Content is GeometryModel3D g)
+            {
+                g.Material = selectedMaterial;
+                g.BackMaterial = selectedMaterial;
+            }
+            if (obj.Content is Model3DGroup group)
+            {
+                foreach (var child in group.Children)
+                {
+                    if (child is GeometryModel3D cg)
+                    {
+                        cg.Material = selectedMaterial;
+                        cg.BackMaterial = selectedMaterial;
+                    }
+                }
+            }
+        }
+
+        private void ShowHotkeys_Click(object sender, RoutedEventArgs e)
+        {
+            var window = new HotkeysWindow
+            {
+                Owner = this
+            };
+            window.ShowDialog();
+        }
+
+
+
+
+
 
     }
 }
