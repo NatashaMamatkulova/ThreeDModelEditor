@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ThreeDModelEditor"
         mc:Ignorable="d"
-        Title="Справка по клавишам" Height="400" Width="500"
+        Title="Справка по клавишам" Icon="icon.ico" Height="400" Width="500"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize">
     <ScrollViewer VerticalScrollBarVisibility="Auto">

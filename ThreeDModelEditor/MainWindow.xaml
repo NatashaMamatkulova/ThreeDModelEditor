@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:ThreeDModelEditor"
         mc:Ignorable="d"
         xmlns:helix="http://helix-toolkit.org/wpf"
-        Title="3D Создание" Height="700" Width="900" MinHeight="700" MinWidth="900">
+        Title="3D Создание" Icon="icon.ico" Height="700" Width="900" MinHeight="700" MinWidth="900">
 
     <DockPanel>
 

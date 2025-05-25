@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ThreeDModelEditor"
         mc:Ignorable="d"
-        Title="Добавить пирамиду / конус" Height="220" Width="300" WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+        Title="Добавить пирамиду / конус" Icon="icon.ico" Height="220" Width="300" WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
