@@ -81,7 +81,6 @@
                     <Button Content="Повернуть" Click="RotateButton_Click" Margin="0,5"/>
 
                     <Separator Margin="5"/>
-                    <TextBlock Text="Слои:" FontWeight="Bold" Margin="0,5"/>
                     <StackPanel x:Name="LayerPanel"/>
                     <TextBlock Text="Объекты:" FontWeight="Bold" Margin="0,5"/>
                     <TreeView x:Name="ObjectTree" Height="200" SelectedItemChanged="ObjectTree_SelectedItemChanged"/>
