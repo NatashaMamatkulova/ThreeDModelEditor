@@ -290,11 +290,6 @@ namespace ThreeDModelEditor
                 }
             }
 
-            if (copiedObjects.Count > 0)
-            {
-                MessageBox.Show($"Скопировано {copiedObjects.Count} объектов", "Информация",
-                               MessageBoxButton.OK, MessageBoxImage.Information);
-            }
         }
 
         private void PasteCopiedObjects()
